@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SBOM — Service Determination</title>
+  <style>
+    :root {
+      --primary:        #1D4ED8;
+      --primary-light:  #DBEAFE;
+      --primary-mid:    #93C5FD;
+      --copilot:        #7C3AED;
+      --copilot-light:  #EDE9FE;
+      --copilot-mid:    #C4B5FD;
+      --success:        #059669;
+      --success-light:  #D1FAE5;
+      --danger:         #DC2626;
+      --danger-light:   #FEE2E2;
+      --warning:        #D97706;
+      --warning-light:  #FEF3C7;
+      --gray-50:  #F9FAFB;
+      --gray-100: #F3F4F6;
+      --gray-200: #E5E7EB;
+      --gray-300: #D1D5DB;
+      --gray-400: #9CA3AF;
+      --gray-500: #6B7280;
+      --gray-600: #4B5563;
+      --gray-700: #374151;
+      --gray-800: #1F2937;
+      --gray-900: #111827;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+      background: #F1F5F9;
+      color: var(--gray-800);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       HEADER
+    ═══════════════════════════════════════ */
+    .app-header {
+      height: 54px;
+      background: var(--gray-900);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    .logo-mark {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, #3B82F6 0%, #7C3AED 100%);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 800; color: white;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+
+    .logo-label { color: white; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
+    .logo-sep { color: var(--gray-600); font-size: 16px; font-weight: 300; }
+    .logo-sub { color: var(--gray-400); font-size: 13px; font-weight: 400; }
+
+    .hdr-spacer { flex: 1; }
+
+    .hdr-chip {
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .hdr-chip.pending { background: rgba(251,191,36,0.15); color: #FCD34D; border: 1px solid rgba(251,191,36,0.25); }
+    .hdr-chip.done    { background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid rgba(16,185,129,0.25); }
+
+    /* Copilot button */
+    .copilot-btn {
+      position: relative;
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 14px;
+      background: linear-gradient(135deg, #7C3AED, #4F46E5);
+      color: white;
+      border: none; border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px; font-weight: 600;
+      transition: all 0.18s ease;
+      box-shadow: 0 2px 8px rgba(124,58,237,0.35);
+      white-space: nowrap;
+    }
+    .copilot-btn:hover {
+      background: linear-gradient(135deg, #6D28D9, #4338CA);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(124,58,237,0.5);
+    }
+    .copilot-btn.active {
+      background: linear-gradient(135deg, #5B21B6, #3730A3);
+      box-shadow: 0 2px 6px rgba(124,58,237,0.3);
+    }
+    .pulse-dot {
+      width: 7px; height: 7px;
+      background: #10B981; border-radius: 50%;
+      animation: pulse 2.2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.65; transform:scale(1.4); }
+    }
+    .notif-badge {
+      position: absolute; top: -5px; right: -5px;
+      width: 17px; height: 17px;
+      background: #EF4444; color: white;
+      border-radius: 50%; font-size: 9px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--gray-900);
+      transition: all 0.2s;
+    }
+
+    /* ═══════════════════════════════════════
+       BODY LAYOUT
+    ═══════════════════════════════════════ */
+    .body-wrap {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       LEFT — TABLE AREA
+    ═══════════════════════════════════════ */
+    .table-area {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      padding: 14px 20px 10px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .table-title-block .table-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
+    .table-title-block .table-sub { font-size: 12px; color: var(--gray-500); margin-top: 1px; }
+
+    .filter-pills { display: flex; gap: 6px; }
+    .fpill {
+      padding: 5px 12px; border-radius: 99px;
+      border: 1.5px solid var(--gray-200); background: white;
+      font-size: 12px; font-weight: 500; color: var(--gray-500);
+      cursor: pointer; transition: all 0.13s;
+    }
+    .fpill.active, .fpill:hover {
+      background: var(--primary-light); color: var(--primary);
+      border-color: var(--primary-mid);
+    }
+
+    .table-scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 0 20px 20px;
+    }
+
+    /* Table */
+    table.parts {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.05);
+      overflow: hidden;
+      min-width: 900px;
+    }
+    table.parts thead th {
+      padding: 10px 14px;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--gray-500);
+      background: var(--gray-50);
+      border-bottom: 1px solid var(--gray-200);
+      white-space: nowrap;
+      position: sticky; top: 0; z-index: 5;
+    }
+    table.parts tbody tr {
+      transition: background 0.1s;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    table.parts tbody tr:last-child { border-bottom: none; }
+    table.parts tbody tr:hover { background: #FAFAFA; }
+    table.parts tbody tr.row-y { background: #F0FDF4; }
+    table.parts tbody tr.row-y:hover { background: #ECFDF5; }
+    table.parts tbody tr.row-n { background: #FFF7F7; }
+    table.parts tbody tr.row-n:hover { background: #FFF1F1; }
+    table.parts tbody tr.row-ai-focus { background: #FFF7ED; }
+    table.parts td {
+      padding: 10px 14px;
+      font-size: 12.5px;
+      color: var(--gray-700);
+      vertical-align: top;
+    }
+
+    .pnum { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; font-weight: 700; color: var(--primary); }
+    .pdesc { font-weight: 600; color: var(--gray-800); font-size: 13px; }
+    .psub  { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
+
+    .assy-num {
+      display: inline-block; padding: 1px 7px;
+      background: var(--gray-100); border-radius: 4px;
+      font-family: monospace; font-size: 11px; color: var(--gray-600);
+      margin-bottom: 2px;
+    }
+    .assy-desc { font-size: 11px; color: var(--gray-500); }
+
+    .use-tag {
+      display: inline-block; margin: 1px 2px;
+      padding: 1px 6px; border-radius: 4px;
+      background: var(--primary-light); color: var(--primary);
+      font-size: 10px; font-weight: 500;
+    }
+
+    .ai-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+    .ai-badge.y      { background: var(--success-light); color: var(--success); }
+    .ai-badge.n      { background: var(--danger-light); color: var(--danger); }
+    .ai-badge.review { background: var(--warning-light); color: var(--warning); }
+
+    .yn-wrap { display: flex; gap: 5px; align-items: center; }
+    .yn-btn {
+      width: 34px; height: 28px; border-radius: 6px;
+      border: 1.5px solid var(--gray-200);
+      font-size: 12px; font-weight: 700;
+      cursor: pointer; background: white; color: var(--gray-400);
+      transition: all 0.13s; display: flex; align-items: center; justify-content: center;
+    }
+    .yn-btn.y-btn:hover, .yn-btn.y-btn.sel {
+      border-color: var(--success); color: var(--success); background: var(--success-light);
+    }
+    .yn-btn.n-btn:hover, .yn-btn.n-btn.sel {
+      border-color: var(--danger); color: var(--danger); background: var(--danger-light);
+    }
+
+    /* ═══════════════════════════════════════
+       RIGHT — COPILOT PANEL
+    ═══════════════════════════════════════ */
+    .copilot-panel {
+      width: 0;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: white;
+      border-left: 1px solid var(--gray-200);
+      display: flex;
+      flex-direction: column;
+      transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .copilot-panel.open { width: 400px; }
+
+    .cp-inner {
+      width: 400px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Panel header */
+    .cp-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--gray-100);
+      background: linear-gradient(160deg, #F5F3FF 0%, #EDE9FE 100%);
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+    .cp-avatar {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, #7C3AED, #4F46E5);
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+    }
+    .cp-header-title  { font-size: 13px; font-weight: 700; color: var(--gray-900); }
+    .cp-header-status { font-size: 11px; color: var(--copilot); font-weight: 500; }
+    .cp-close {
+      margin-left: auto;
+      width: 26px; height: 26px;
+      border-radius: 6px; border: none;
+      background: rgba(0,0,0,0.06); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--gray-500); font-size: 14px;
+      transition: background 0.12s;
+    }
+    .cp-close:hover { background: rgba(0,0,0,0.12); }
+
+    /* Messages */
+    .cp-messages {
+      flex: 1; overflow-y: auto;
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--gray-400); }
+
+    /* Message rows */
+    .msg-row { display: flex; gap: 7px; animation: fadeUp 0.28s ease; }
+    .msg-row.user-row { flex-direction: row-reverse; }
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(7px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .msg-ava {
+      width: 26px; height: 26px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0; margin-top: 2px;
+    }
+    .msg-ava.ai   { background: linear-gradient(135deg, #7C3AED, #4F46E5); color: white; font-size: 14px; }
+    .msg-ava.user { background: var(--gray-200); font-size: 10px; font-weight: 700; color: var(--gray-600); }
+
+    .msg-body { flex: 1; min-width: 0; max-width: calc(100% - 36px); }
+
+    .bubble {
+      padding: 9px 13px;
+      border-radius: 12px;
+      font-size: 13px; line-height: 1.55;
+      display: inline-block; max-width: 100%;
+    }
+    .msg-row:not(.user-row) .bubble {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-150, #EAECF0);
+      border-radius: 3px 12px 12px 12px;
+      color: var(--gray-800);
+    }
+    .msg-row.user-row .bubble {
+      background: var(--copilot);
+      color: white;
+      border-radius: 12px 3px 12px 12px;
+      margin-left: auto;
+      display: block;
+    }
+
+    /* Typing indicator */
+    .typing-bubble {
+      padding: 10px 14px;
+      background: var(--gray-50);
+      border: 1px solid #EAECF0;
+      border-radius: 3px 12px 12px 12px;
+      display: inline-flex; gap: 4px; align-items: center;
+    }
+    .tdot {
+      width: 6px; height: 6px;
+      background: var(--gray-400); border-radius: 50%;
+      animation: tdots 1.3s infinite ease-in-out;
+    }
+    .tdot:nth-child(2) { animation-delay: .18s; }
+    .tdot:nth-child(3) { animation-delay: .36s; }
+    @keyframes tdots {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-5px); }
+    }
+
+    /* Widgets */
+    .widget { margin-top: 2px; }
+
+    .summary-card {
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: 10px; overflow: hidden; font-size: 12px;
+    }
+    .sc-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 12px; border-bottom: 1px solid var(--gray-100);
+    }
+    .sc-row:last-child { border-bottom: none; }
+    .sc-label { display: flex; align-items: center; gap: 6px; color: var(--gray-600); }
+    .sc-num { font-size: 15px; font-weight: 800; }
+    .sc-num.blue   { color: var(--primary); }
+    .sc-num.green  { color: var(--success); }
+    .sc-num.red    { color: var(--danger); }
+    .sc-num.amber  { color: var(--warning); }
+
+    /* Action buttons group */
+    .actions-group { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+    .act-btn {
+      padding: 9px 13px; border-radius: 9px;
+      border: 1.5px solid; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.14s;
+      display: flex; align-items: center; gap: 7px;
+      text-align: left;
+    }
+    .act-btn.purple {
+      border-color: var(--copilot); color: var(--copilot); background: var(--copilot-light);
+    }
+    .act-btn.purple:hover { background: var(--copilot); color: white; }
+    .act-btn.green  {
+      border-color: var(--success); color: var(--success); background: var(--success-light);
+    }
+    .act-btn.green:hover  { background: var(--success); color: white; }
+    .act-btn.neutral {
+      border-color: var(--gray-200); color: var(--gray-600); background: white;
+    }
+    .act-btn.neutral:hover { background: var(--gray-50); border-color: var(--gray-300); }
+    .act-btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+
+    /* Rec cards */
+    .rec-card {
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: 8px; padding: 10px; margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .rc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .rc-num { font-family: monospace; font-weight: 700; font-size: 11px; color: var(--primary); }
+    .rc-badge {
+      padding: 2px 8px; border-radius: 99px;
+      font-size: 11px; font-weight: 700;
+    }
+    .rc-badge.y { background: var(--success-light); color: var(--success); }
+    .rc-badge.n { background: var(--danger-light); color: var(--danger); }
+    .rc-badge.r { background: var(--warning-light); color: var(--warning); }
+    .rc-desc { font-weight: 600; color: var(--gray-800); margin-bottom: 4px; }
+    .rc-reason { font-size: 11px; color: var(--gray-500); line-height: 1.45; }
+    .rc-reason em { color: var(--copilot); font-style: normal; font-weight: 600; }
+
+    /* Auto-rule card */
+    .autorule-card {
+      background: linear-gradient(145deg, #F5F3FF, #EDE9FE);
+      border: 1px solid var(--copilot-mid);
+      border-radius: 10px; padding: 12px; margin-top: 2px;
+    }
+    .ar-title { font-size: 12px; font-weight: 700; color: var(--copilot); margin-bottom: 5px; }
+    .ar-desc  { font-size: 12px; color: var(--gray-700); line-height: 1.5; margin-bottom: 8px; }
+    .ar-list  { font-size: 11px; color: var(--gray-600); margin: 4px 0 10px 12px; line-height: 1.7; }
+
+    /* Input area */
+    .cp-input-area {
+      padding: 10px 14px 12px;
+      border-top: 1px solid var(--gray-100);
+      background: white; flex-shrink: 0;
+    }
+    .input-row { display: flex; gap: 7px; align-items: flex-end; }
+    .chat-textarea {
+      flex: 1;
+      border: 1.5px solid var(--gray-200); border-radius: 10px;
+      padding: 8px 11px; font-size: 13px;
+      font-family: inherit; color: var(--gray-800);
+      resize: none; outline: none; max-height: 80px;
+      transition: border-color 0.15s; background: var(--gray-50);
+    }
+    .chat-textarea:focus { border-color: var(--copilot); background: white; }
+    .chat-textarea::placeholder { color: var(--gray-400); }
+    .send-btn {
+      width: 34px; height: 34px; border-radius: 9px;
+      border: none; background: var(--copilot); color: white;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0; transition: all 0.14s;
+    }
+    .send-btn:hover { background: #6D28D9; transform: scale(1.06); }
+    .input-hint { font-size: 10px; color: var(--gray-400); text-align: center; margin-top: 5px; }
+
+    /* Divider in chat */
+    .chat-divider {
+      text-align: center; font-size: 10px; color: var(--gray-400);
+      margin: 4px 0; font-weight: 500; letter-spacing: 0.03em;
+    }
+
+    /* ═══════════════════════════════════════
+       UTILITIES
+    ═══════════════════════════════════════ */
+    strong { font-weight: 700; }
+    .txt-success { color: var(--success); }
+    .txt-danger  { color: var(--danger); }
+    .txt-copilot { color: var(--copilot); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     HEADER
+══════════════════════════════════ -->
+<header class="app-header">
+  <div class="logo-mark">SB</div>
+  <span class="logo-label">SBOM</span>
+  <span class="logo-sep">/</span>
+  <span class="logo-sub">Service Determination</span>
+  <div class="hdr-spacer"></div>
+  <span class="hdr-chip pending" id="stat-pending">⏳ 12 Pending</span>
+  <span class="hdr-chip done" id="stat-done">✓ 0 Completed</span>
+  <button class="copilot-btn" id="copilot-btn" onclick="toggleCopilot()">
+    <div class="pulse-dot"></div>
+    ✦ AI Copilot
+    <div class="notif-badge" id="notif-badge">12</div>
+  </button>
+</header>
+
+<!-- ══════════════════════════════════
+     BODY
+══════════════════════════════════ -->
+<div class="body-wrap">
+
+  <!-- TABLE AREA -->
+  <div class="table-area">
+    <div class="table-toolbar">
+      <div class="table-title-block">
+        <div class="table-title">Pending Service Determination</div>
+        <div class="table-sub">Decide whether each part requires aftermarket service stocking</div>
+      </div>
+      <div class="filter-pills">
+        <button class="fpill active" onclick="filterRows('all',this)">All (12)</button>
+        <button class="fpill" onclick="filterRows('pending',this)">Pending</button>
+        <button class="fpill" onclick="filterRows('y',this)">Serviced: Y</button>
+        <button class="fpill" onclick="filterRows('n',this)">Serviced: N</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="parts">
+        <thead>
+          <tr>
+            <th style="width:96px">Part #</th>
+            <th style="width:160px">Description</th>
+            <th style="width:170px">Up-Level Assembly</th>
+            <th style="width:170px">Down-Level Components</th>
+            <th>Used In (Model / Series)</th>
+            <th style="width:76px">AI Rec.</th>
+            <th style="width:80px">Decision</th>
+          </tr>
+        </thead>
+        <tbody id="parts-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- COPILOT PANEL -->
+  <div class="copilot-panel" id="copilot-panel">
+    <div class="cp-inner">
+
+      <div class="cp-header">
+        <div class="cp-avatar">✦</div>
+        <div>
+          <div class="cp-header-title">AI Copilot</div>
+          <div class="cp-header-status" id="cp-status">● Ready to analyze</div>
+        </div>
+        <button class="cp-close" onclick="toggleCopilot()">✕</button>
+      </div>
+
+      <div class="cp-messages" id="cp-messages"></div>
+
+      <div class="cp-input-area">
+        <div class="input-row">
+          <textarea class="chat-textarea" id="chat-input"
+            placeholder="Ask about a specific part…"
+            rows="1"
+            onkeydown="handleKey(event)"></textarea>
+          <button class="send-btn" onclick="sendUserMsg()">↑</button>
+        </div>
+        <div class="input-hint">Enter to send · Shift+Enter for newline</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end body-wrap -->
+
+
+<script>
+/* ════════════════════════════════════════════════
+   DATA
+════════════════════════════════════════════════ */
+const PARTS = [
+  {
+    id:'BRK-2041', desc:'Disc Brake Pad Set — Front',
+    up:{num:'88201', desc:'Front Axle Brake Assembly'},
+    down:['Friction material pad','Steel backing plate','Anti-squeal shim'],
+    used:['Camry LE 2024-25','Camry SE 2024-25','Camry XSE 2024'],
+    series:'Series B/C',
+    rec:'Y',
+    reason:'All brake friction components in Series B/C are historically <em>100% service parts</em>. Critical safety wear item with high dealer demand.',
+    decision:null
+  },
+  {
+    id:'BRK-2042', desc:'Disc Brake Pad Set — Rear',
+    up:{num:'88202', desc:'Rear Axle Brake Assembly'},
+    down:['Friction material pad','Steel backing plate'],
+    used:['Camry LE 2024-25','Camry SE 2024-25'],
+    series:'Series B',
+    rec:'Y',
+    reason:'Same category as front pads. Periodic wear item; <em>100% Y rate</em> for rear brake pads across the platform.',
+    decision:null
+  },
+  {
+    id:'FLT-1089', desc:'Engine Oil Filter',
+    up:{num:'17001', desc:'Engine Lubrication System'},
+    down:['Filter element','Sealing gasket','Drain plug'],
+    used:['Camry ALL 2024-25','Corolla 2024'],
+    series:'Series A/B/C',
+    rec:'Y',
+    reason:'High-volume maintenance consumable used across 2 models. <em>100% of oil filters</em> in Toyota lineup are service items.',
+    decision:null
+  },
+  {
+    id:'FLT-1090', desc:'Air Filter Element',
+    up:{num:'17420', desc:'Air Intake System Assembly'},
+    down:['Filter media','Rubber seal ring'],
+    used:['Camry 2.5L 2024-25'],
+    series:'Series B',
+    rec:'Y',
+    reason:'Scheduled maintenance item — replaced every 30,000 km. <em>98% Y rate</em> for air filter elements across Toyota platforms.',
+    decision:null
+  },
+  {
+    id:'SNS-3301', desc:'Oxygen Sensor — Upstream',
+    up:{num:'25030', desc:'Exhaust System Assembly'},
+    down:['Sensor element','Wiring connector','Heat shield'],
+    used:['Camry 2.5L LE 2024','Camry 2.5L SE 2024'],
+    series:'Series B',
+    rec:'Y',
+    reason:'Engine-management sensor; failure-prone over time. <em>High DIY and dealer replacement volume</em>. Consistent Y across all emission-controlled markets.',
+    decision:null
+  },
+  {
+    id:'SNS-3302', desc:'Parking Sensor — Rear',
+    up:{num:'89341', desc:'Rear Bumper Assembly'},
+    down:['Ultrasonic transducer','Wiring harness'],
+    used:['Camry XSE 2024-25','Camry XLE 2024-25'],
+    series:'Series C',
+    rec:'Y',
+    reason:'Collision-susceptible component. <em>92% Y rate</em> for proximity sensors. High collision repair demand in XSE/XLE trim level.',
+    decision:null
+  },
+  {
+    id:'ELC-7701', desc:'Power Window Switch',
+    up:{num:'84810', desc:'Door Control Module'},
+    down:['Switch assembly','Connector plug'],
+    used:['Camry LE 2024-25'],
+    series:'Series B',
+    rec:'Y',
+    reason:'Electrical switch with high failure rate. <em>Frequently replaced</em> in both warranty and extended-service claims.',
+    decision:null
+  },
+  {
+    id:'SUS-4401', desc:'Front Strut Mount',
+    up:{num:'48609', desc:'Front Strut Assembly'},
+    down:['Upper bearing','Rubber isolator','Mount plate'],
+    used:['Camry SE 2024-25','Camry XSE 2024-25'],
+    series:'Series C',
+    rec:'Y',
+    reason:'Suspension wear item always included in strut service kits. <em>96% Y rate</em> historically for this part class.',
+    decision:null
+  },
+  {
+    id:'TRM-5501', desc:'Door Trim Panel Clip',
+    up:{num:'67001', desc:'Front Door Trim Panel'},
+    down:['Plastic retainer clip'],
+    used:['Camry ALL 2024-25'],
+    series:'Series A/B/C',
+    rec:'N',
+    reason:'Generic plastic fastener. <em>94% N rate</em> for this clip category — supplied as part of parent trim panel, not stocked separately.',
+    decision:null
+  },
+  {
+    id:'TRM-5502', desc:'Headliner Retaining Clip',
+    up:{num:'63300', desc:'Roof Headliner Assembly'},
+    down:['Plastic retaining clip'],
+    used:['Camry LE 2024','Camry SE 2024'],
+    series:'Series B',
+    rec:'N',
+    reason:'Interior headliner clips are bundled with the headliner kit. <em>No standalone service history found. 89% N rate</em>.',
+    decision:null
+  },
+  {
+    id:'ELC-7702', desc:'USB Charging Port Cover',
+    up:{num:'55630', desc:'Center Console Assembly'},
+    down:['Plastic cover flap','Hinge pin'],
+    used:['Camry XSE 2024'],
+    series:'Series C',
+    rec:'N',
+    reason:'Cosmetic cover with very low standalone demand. <em>91% N rate</em>; typically replaced as part of the console unit.',
+    decision:null
+  },
+  {
+    id:'SUS-4402', desc:'Sway Bar End Link',
+    up:{num:'48820', desc:'Front Suspension Assembly'},
+    down:['Ball stud','Link rod','Rubber bushings'],
+    used:['Camry ALL 2024-25'],
+    series:'Series A/B/C',
+    rec:'REVIEW',
+    reason:'Mixed classification history: <em>62% Y / 38% N</em> across markets. High volume on Camry platform but stocking varies by region. Manual review recommended before deciding.',
+    decision:null
+  }
+];
+
+/* ════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════ */
+let panelOpen   = false;
+let chatStarted = false;
+let pending     = 12;
+let done        = 0;
+
+/* ════════════════════════════════════════════════
+   TABLE RENDER
+════════════════════════════════════════════════ */
+function renderTable(filter = 'all') {
+  const tb = document.getElementById('parts-tbody');
+  tb.innerHTML = '';
+  PARTS.forEach(p => {
+    if (filter === 'y'       && p.decision !== 'Y') return;
+    if (filter === 'n'       && p.decision !== 'N') return;
+    if (filter === 'pending' && p.decision !== null) return;
+
+    const recCls = p.rec === 'Y' ? 'y' : p.rec === 'N' ? 'n' : 'review';
+    const recTxt = p.rec === 'Y' ? '✓ Y' : p.rec === 'N' ? '✗ N' : '⚠ Review';
+    const rowCls = p.decision === 'Y' ? 'row-y' : p.decision === 'N' ? 'row-n' : '';
+
+    const tr = document.createElement('tr');
+    tr.id = 'row-' + p.id;
+    tr.className = rowCls;
+    tr.innerHTML = `
+      <td><span class="pnum">${p.id}</span></td>
+      <td>
+        <div class="pdesc">${p.desc}</div>
+        <div class="psub">${p.series}</div>
+      </td>
+      <td>
+        <div class="assy-num">${p.up.num}</div>
+        <div class="assy-desc">${p.up.desc}</div>
+      </td>
+      <td>
+        <div class="psub">${p.down.slice(0,2).join(', ')}${p.down.length>2?'…':''}</div>
+      </td>
+      <td>
+        ${p.used.map(u => `<span class="use-tag">${u}</span>`).join('')}
+      </td>
+      <td><span class="ai-badge ${recCls}">${recTxt}</span></td>
+      <td>
+        <div class="yn-wrap">
+          <button class="yn-btn y-btn${p.decision==='Y'?' sel':''}" onclick="decide('${p.id}','Y')">Y</button>
+          <button class="yn-btn n-btn${p.decision==='N'?' sel':''}" onclick="decide('${p.id}','N')">N</button>
+        </div>
+      </td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+function decide(partId, val) {
+  const p = PARTS.find(x => x.id === partId);
+  if (!p) return;
+  const wasNull = p.decision === null;
+  p.decision = val;
+  if (wasNull) { pending--; done++; }
+  updateStats();
+  renderTable(currentFilter);
+}
+
+function batchDecide(ids, val) {
+  ids.forEach(id => {
+    const p = PARTS.find(x => x.id === id);
+    if (p && p.decision === null) { p.decision = val; pending--; done++; }
+  });
+  updateStats();
+  renderTable(currentFilter);
+}
+
+let currentFilter = 'all';
+function filterRows(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.fpill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable(f);
+}
+
+function updateStats() {
+  document.getElementById('stat-pending').textContent = `⏳ ${pending} Pending`;
+  document.getElementById('stat-done').textContent    = `✓ ${done} Completed`;
+  const badge = document.getElementById('notif-badge');
+  badge.textContent   = pending;
+  badge.style.display = pending > 0 ? 'flex' : 'none';
+}
+
+/* ════════════════════════════════════════════════
+   COPILOT TOGGLE
+════════════════════════════════════════════════ */
+function toggleCopilot() {
+  panelOpen = !panelOpen;
+  document.getElementById('copilot-panel').classList.toggle('open', panelOpen);
+  document.getElementById('copilot-btn').classList.toggle('active', panelOpen);
+  if (panelOpen && !chatStarted) {
+    chatStarted = true;
+    setTimeout(startFlow, 250);
+  }
+}
+
+/* ════════════════════════════════════════════════
+   CHAT ENGINE
+════════════════════════════════════════════════ */
+const msgs = () => document.getElementById('cp-messages');
+
+function scrollBottom() {
+  const m = msgs();
+  m.scrollTop = m.scrollHeight;
+}
+
+function addAIMsg(html, delay=0) {
+  return new Promise(res => setTimeout(() => {
+    removeTyping();
+    const row = document.createElement('div');
+    row.className = 'msg-row';
+    row.innerHTML = `
+      <div class="msg-ava ai">✦</div>
+      <div class="msg-body"><div class="bubble">${html}</div></div>
+    `;
+    msgs().appendChild(row);
+    scrollBottom(); res();
+  }, delay));
+}
+
+function addUserMsg(html) {
+  const row = document.createElement('div');
+  row.className = 'msg-row user-row';
+  row.innerHTML = `
+    <div class="msg-ava user">L</div>
+    <div class="msg-body"><div class="bubble">${html}</div></div>
+  `;
+  msgs().appendChild(row);
+  scrollBottom();
+}
+
+function addWidget(html, delay=0) {
+  return new Promise(res => setTimeout(() => {
+    removeTyping();
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    wrap.style.animation = 'fadeUp 0.28s ease';
+    msgs().appendChild(wrap);
+    scrollBottom(); res();
+  }, delay));
+}
+
+function showTyping(delay=0) {
+  return new Promise(res => setTimeout(() => {
+    removeTyping();
+    const row = document.createElement('div');
+    row.className = 'msg-row typing-row';
+    row.innerHTML = `
+      <div class="msg-ava ai">✦</div>
+      <div class="msg-body">
+        <div class="typing-bubble">
+          <div class="tdot"></div><div class="tdot"></div><div class="tdot"></div>
+        </div>
+      </div>`;
+    msgs().appendChild(row);
+    scrollBottom(); res();
+  }, delay));
+}
+
+function removeTyping() {
+  const t = msgs().querySelector('.typing-row');
+  if (t) t.remove();
+}
+
+function disableActionBtns() {
+  msgs().querySelectorAll('.act-btn').forEach(b => b.disabled = true);
+}
+
+/* ════════════════════════════════════════════════
+   CHAT FLOWS
+════════════════════════════════════════════════ */
+async function startFlow() {
+  document.getElementById('cp-status').textContent = '● Analyzing task list…';
+  msgs().innerHTML = '';
+
+  await showTyping(200);
+  await addAIMsg(`Hi Luke! 👋 I'm your <strong>SBOM Service Determination Copilot</strong>.<br>I've finished analyzing your task list and I'm ready to help you work through the decisions.`, 1100);
+
+  await showTyping(1600);
+  await addAIMsg(`Here's a summary of your current workload:`, 2400);
+
+  await addWidget(`
+    <div style="padding-left:33px">
+      <div class="summary-card widget">
+        <div class="sc-row"><span class="sc-label">📋 Total tasks pending</span><span class="sc-num blue">12</span></div>
+        <div class="sc-row"><span class="sc-label">🟢 I recommend <strong>Y</strong> — Service Part</span><span class="sc-num green">8</span></div>
+        <div class="sc-row"><span class="sc-label">🔴 I recommend <strong>N</strong> — Not Service</span><span class="sc-num red">3</span></div>
+        <div class="sc-row"><span class="sc-label">🟡 Needs your manual review</span><span class="sc-num amber">1</span></div>
+      </div>
+    </div>
+  `, 2900);
+
+  await showTyping(3600);
+  await addAIMsg(`My analysis is based on <strong>historical service classification rates</strong>, part-type patterns, and cross-model usage data. Want to see the full breakdown, or apply everything now?`, 4500);
+
+  await addWidget(`
+    <div style="padding-left:33px">
+      <div class="actions-group widget" id="flow-1-actions">
+        <button class="act-btn purple" onclick="flow_showRecs()">🔍 Show All Recommendations</button>
+        <button class="act-btn green"  onclick="flow_applyDirect()">⚡ Apply All Recommendations Now</button>
+        <button class="act-btn neutral" onclick="flow_manual()">✏️ I'll review manually</button>
+      </div>
+    </div>
+  `, 4900);
+
+  document.getElementById('cp-status').textContent = '● Ready';
+}
+
+/* ─── Flow: Show recommendations ─── */
+async function flow_showRecs() {
+  disableActionBtns();
+  addUserMsg('🔍 Show All Recommendations');
+
+  const yParts  = PARTS.filter(p => p.rec === 'Y');
+  const nParts  = PARTS.filter(p => p.rec === 'N');
+  const rvParts = PARTS.filter(p => p.rec === 'REVIEW');
+
+  await showTyping(300);
+  await addAIMsg(`Here are all <strong>12 recommendations</strong>. Starting with the <strong>8 parts I suggest marking Y</strong>:`, 900);
+
+  const yCards = yParts.map(p => recCard(p,'Y')).join('');
+  await addWidget(`<div style="padding-left:33px" class="widget">${yCards}</div>`, 1300);
+
+  await showTyping(2100);
+  await addAIMsg(`And the <strong>3 parts I suggest marking N</strong> (non-service):`, 2900);
+
+  const nCards = nParts.map(p => recCard(p,'N')).join('');
+  await addWidget(`<div style="padding-left:33px" class="widget">${nCards}</div>`, 3300);
+
+  await showTyping(4100);
+  await addAIMsg(`Finally, <strong>1 part needs your personal judgement</strong>:`, 4700);
+
+  const rvCards = rvParts.map(p => recCard(p,'REVIEW')).join('');
+  await addWidget(`<div style="padding-left:33px" class="widget">${rvCards}</div>`, 5100);
+
+  await showTyping(5900);
+  await addAIMsg(`Ready to apply? I'll set <strong class="txt-success">Y on 8 parts</strong> and <strong class="txt-danger">N on 3 parts</strong>. SUS-4402 stays pending for your call.`, 6600);
+
+  await addWidget(`
+    <div style="padding-left:33px">
+      <div class="actions-group widget" id="flow-2-actions">
+        <button class="act-btn green"   onclick="flow_applyRecs()">✅ Yes — Apply These Decisions</button>
+        <button class="act-btn neutral" onclick="flow_manual()">🚫 No — I'll Decide Manually</button>
+      </div>
+    </div>
+  `, 7000);
+}
+
+function recCard(p, type) {
+  const cls = type==='Y' ? 'y' : type==='N' ? 'n' : 'r';
+  const lbl = type==='Y' ? '✓ Y — Service Part' : type==='N' ? '✗ N — Not Service' : '⚠ Needs Review';
+  return `
+    <div class="rec-card">
+      <div class="rc-top">
+        <span class="rc-num">${p.id}</span>
+        <span class="rc-badge ${cls}">${lbl}</span>
+      </div>
+      <div class="rc-desc">${p.desc}</div>
+      <div class="rc-reason">💡 ${p.reason}</div>
+    </div>`;
+}
+
+/* ─── Flow: Apply direct (no walk-through) ─── */
+async function flow_applyDirect() {
+  disableActionBtns();
+  addUserMsg('⚡ Apply All Recommendations Now');
+  await _applyCore();
+}
+
+/* ─── Flow: Apply after walk-through ─── */
+async function flow_applyRecs() {
+  disableActionBtns();
+  addUserMsg('✅ Yes — Apply These Decisions');
+  await _applyCore();
+}
+
+async function _applyCore() {
+  document.getElementById('cp-status').textContent = '● Applying decisions…';
+  await showTyping(300);
+  await addAIMsg(`Applying decisions to the task list…`, 800);
+
+  const yIds = PARTS.filter(p => p.rec === 'Y').map(p => p.id);
+  const nIds = PARTS.filter(p => p.rec === 'N').map(p => p.id);
+
+  batchDecide(yIds, 'Y');
+  await new Promise(r => setTimeout(r, 500));
+  batchDecide(nIds, 'N');
+
+  await showTyping(1800);
+  await addAIMsg(`
+    ✅ Done! Updated <strong class="txt-success">8 parts → Y</strong> and <strong class="txt-danger">3 parts → N</strong>.<br><br>
+    ⚠️ <strong>SUS-4402 Sway Bar End Link</strong> is still pending — I recommend checking your regional stocking data before deciding (62%/38% split historically).
+  `, 2600);
+
+  // Auto-rule offer
+  await showTyping(3400);
+  await addWidget(`
+    <div style="padding-left:33px">
+      <div class="autorule-card widget">
+        <div class="ar-title">💡 Auto-Rule Opportunity</div>
+        <div class="ar-desc">I noticed consistent patterns across this batch. Would you like me to <strong>automatically apply Y next time</strong> — without asking — for these categories?</div>
+        <div class="ar-list">
+          • Brake friction components (BRK-*)<br>
+          • Filter / maintenance items (FLT-*)<br>
+          • Engine management sensors (SNS-*)<br>
+          • Suspension wear parts (SUS-4401 class)
+        </div>
+        <div class="actions-group" id="flow-3-actions">
+          <button class="act-btn purple" onclick="flow_setAutoRule()">⚡ Set Auto-Rule for These Categories</button>
+          <button class="act-btn neutral" onclick="flow_declineAutoRule()">Not now</button>
+        </div>
+      </div>
+    </div>
+  `, 4000);
+
+  document.getElementById('cp-status').textContent = '● Ready';
+}
+
+/* ─── Flow: Manual ─── */
+async function flow_manual() {
+  disableActionBtns();
+  addUserMsg("I'll review manually");
+  await showTyping(400);
+  await addAIMsg(`No problem! Click the <strong>Y</strong> or <strong>N</strong> buttons directly in the table for each part. I'll be here if you need analysis on any specific part — just type a question below!`, 1100);
+}
+
+/* ─── Flow: Set auto rule ─── */
+async function flow_setAutoRule() {
+  disableActionBtns();
+  addUserMsg('⚡ Set Auto-Rule for These Categories');
+  await showTyping(400);
+  await addAIMsg(`
+    ✅ <strong>Auto-rule activated!</strong><br><br>
+    Starting next batch, I'll automatically set <strong class="txt-success">Y</strong> for:<br>
+    • Brake friction components<br>
+    • Filter / maintenance items<br>
+    • Engine management sensors<br>
+    • Suspension wear parts (4401 class)<br><br>
+    You can review or disable these rules anytime in <strong>Settings → Copilot Rules</strong>.
+  `, 1200);
+}
+
+async function flow_declineAutoRule() {
+  disableActionBtns();
+  addUserMsg('Not now');
+  await showTyping(350);
+  await addAIMsg(`Understood — you can enable auto-rules later from <strong>Settings → Copilot Rules</strong>. Anything else I can help with?`, 1000);
+}
+
+/* ════════════════════════════════════════════════
+   FREE-FORM USER INPUT
+════════════════════════════════════════════════ */
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendUserMsg();
+  }
+  // Auto-resize
+  const t = e.target;
+  t.style.height = 'auto';
+  t.style.height = Math.min(t.scrollHeight, 80) + 'px';
+}
+
+async function sendUserMsg() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  addUserMsg(text);
+
+  const lo = text.toLowerCase();
+  await showTyping(450);
+
+  let reply;
+  if (lo.match(/brk|brake pad/)) {
+    reply = `<strong>BRK-2041 & BRK-2042</strong> are front and rear disc brake pad sets — critical safety wear items in the Series B/C platform. Historical classification is <strong class="txt-success">100% Y</strong> across all brake friction components. These see high dealer and DIY demand every 30-50k km.`;
+  } else if (lo.match(/flt|filter|oil filter|air filter/)) {
+    reply = `<strong>FLT-1089</strong> (oil filter) and <strong>FLT-1090</strong> (air filter) are scheduled maintenance consumables. The oil filter is cross-model (Camry + Corolla 2024) which boosts volume further. I gave both a <strong class="txt-success">Y</strong> — <em>98-100% Y rate</em> historically for this category.`;
+  } else if (lo.match(/sus-4402|sway bar/)) {
+    reply = `<strong>SUS-4402 Sway Bar End Link</strong> is the tricky one in this batch. The split is <em>62% Y / 38% N</em> across the Toyota portfolio — it depends on your regional market. On Camry specifically (used in ALL 2024-25 trims) there's meaningful service volume, but some markets supply it only in a suspension kit. I'd lean <strong class="txt-success">Y</strong> for a high-volume market but recommend confirming with your regional stocking data first.`;
+  } else if (lo.match(/trm|clip|trim|headliner/)) {
+    reply = `The trim clips (<strong>TRM-5501, TRM-5502</strong>) are generic plastic fasteners. They're typically bundled inside the parent assembly kit (door trim panel / headliner assembly) and rarely sold standalone. Historical N rates are <em>89-94%</em> for this category. My recommendation is <strong class="txt-danger">N</strong> for both.`;
+  } else if (lo.match(/sns|sensor|oxygen|parking/)) {
+    reply = `<strong>SNS-3301</strong> (O2 Sensor) and <strong>SNS-3302</strong> (Parking Sensor) are both <strong class="txt-success">Y</strong>. Oxygen sensors fail with age and are very commonly replaced by both dealers and DIY customers. Parking sensors on the XSE/XLE trims are frequently damaged in minor collisions — high collision-repair demand.`;
+  } else if (lo.match(/elc-7701|window switch/)) {
+    reply = `<strong>ELC-7701</strong> Power Window Switch is <strong class="txt-success">Y</strong>. Electrical switches rank among the most frequently replaced interior components, especially in climates with temperature extremes. Strong warranty claim history for this part on the Camry LE.`;
+  } else if (lo.match(/auto.?rule|automatic/)) {
+    reply = `Auto-rules let me skip the confirmation step for part categories where historical agreement is very high (&gt;90%). Once set, I apply decisions silently on the next batch. You can always review, pause, or delete rules in <strong>Settings → Copilot Rules</strong>.`;
+  } else if (lo.match(/why|how do you|how does|reason/)) {
+    reply = `My recommendations draw on four signals:<br>
+      <strong>1.</strong> Historical Y/N classification rates for similar part categories<br>
+      <strong>2.</strong> Whether the part is a consumable or wear item<br>
+      <strong>3.</strong> Cross-model usage breadth (more models = higher demand)<br>
+      <strong>4.</strong> Dealer demand patterns from warranty and service data<br><br>
+      Ask about any specific part number for a detailed breakdown!`;
+  } else if (lo.match(/help|what can you/)) {
+    reply = `I can:<br>
+      • Explain any recommendation in detail<br>
+      • Answer questions about a specific part number<br>
+      • Apply all or selected recommendations to the task list<br>
+      • Set auto-rules for consistent part categories<br><br>
+      Just ask! e.g. <em>"Why Y for BRK-2041?"</em> or <em>"Tell me about SUS-4402"</em>`;
+  } else {
+    reply = `I can analyze any part in the task list. Try asking about a part number like <em>"BRK-2041"</em> or a category like <em>"brake pads"</em> — or ask me to apply the recommendations if you're ready to proceed.`;
+  }
+
+  await addAIMsg(reply, 1400);
+}
+
+/* ════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════ */
+renderTable();
+updateStats();
+</script>
+</body>
+</html>
